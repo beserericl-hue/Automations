@@ -33,6 +33,7 @@ from writer_engine.schemas.chapter import (
     BookEndingDraft,
     BookMarketing,
     ChapterCraftQa,
+    CliffhangerOptions,
     CodaPlan,
     ContinuityFindings,
     DriftFinding,
@@ -6811,6 +6812,98 @@ async def _op_suggest_passage_fix(payload: dict) -> dict:
     return {"ok": False, "reason": f"The engine could not write a safe replacement: {reason}."}
 
 
+async def _op_recommend_cliffhangers(payload: dict) -> dict:
+    """Recommend ways to end one book, read from the plot structure, so the reader needs the next book.
+
+    Reads the book's own outline and where its frame thread last stood, and the next book's outline and
+    opening, and proposes three endings that are different in kind. Each one names what it relies on (facts
+    already in the book), and what it must leave alone (what the next book shows later), so the closing
+    scene drafted from it does not pre-empt or contradict the next book. Nothing is written to the
+    manuscript: the options are kept on the project for the author to choose from.
+    """
+    from writer_engine.config import get_settings
+
+    project_id = str(payload.get("project_id") or "")
+    book = payload.get("book") if isinstance(payload.get("book"), dict) else None
+    if not project_id or not book:
+        return {"ok": False, "reason": "project_id and book required"}
+    reject = functools.partial(_reject_series_piece, payload, "cliffhangers")
+    rows = await _project_chapter_rows(project_id)
+    brows = _rows_of_book(rows, book)
+    if not brows:
+        return await reject("no chapters in that book")
+    nxt = payload.get("next_book") if isinstance(payload.get("next_book"), dict) else None
+    nrows = _rows_of_book(rows, nxt) if nxt else []
+    ctx = await _load_context(project_id, {})
+    outline = ctx.get("outline") or {}
+    act = _frame_act(outline)
+    frame = _frame_rows(outline, brows, act)
+    anchor = frame[-1] if frame else brows[-1]
+    tail = " ".join(str(anchor.get("content_text") or "").split()[-BOOK_CODA_TAIL_WORDS:])
+    next_all = _outline_range_rows(outline, nxt)
+    opening = str(nrows[0].get("content_text") or "")[:BOOK_ENDING_NEXT_OPENING_CHARS] if nrows else ""
+    corpus = "\n".join(str(r.get("content_text") or "") for r in rows)
+    system = (
+        "You are a series editor. Recommend THREE different cliffhanger endings for the end of one book in a "
+        "novel series, so that a reader finishing it has to read the next. Read the plot structure below: what "
+        "this book set going and has not settled, and what the next book does with it.\n"
+        "Rules:\n"
+        "- Each ending is a present-day scene in the frame story, after the book's last chapter and before the "
+        "next book begins. Three that differ in kind (for example: a person's decision, a fact someone learns, "
+        "a danger arriving), not three versions of one idea.\n"
+        "- Use only what the book and the outline already establish. Invent no person, place, document, number or "
+        "rule. If an ending needs a fact that is not in the book, do not recommend it.\n"
+        "- It must end before the next book begins and leave untouched whatever the next book's opening chapters "
+        "and outline show or reveal. Do not repeat a beat the book has already played.\n"
+        "- For each: `title` (a few words), `hook` (one sentence: what the reader is left needing to know), "
+        "`scene` (two or three sentences, written as a direction to the writer: who, where, what happens, how it "
+        "stops), `uses` (the facts and chapters it relies on), `avoid` (what it must not do, so it does not "
+        "contradict or pre-empt the next book).\n"
+        "Reply with strict JSON matching CliffhangerOptions {options:[{title,hook,scene,uses,avoid}]}."
+    )
+    prompt = (
+        f"THE CAST:\n{_roster_text(ctx.get('roster') or [])}\n\n"
+        f"THIS BOOK, CHAPTER BY CHAPTER (outline):\n{_beats_of(outline, brows, 300)}\n\n"
+        f"WHERE THIS BOOK'S FRAME THREAD LAST STOOD:\n…{tail}\n\n"
+        f"THE NEXT BOOK, CHAPTER BY CHAPTER (outline):\n{_beats_of(outline, next_all, 350) or '(none)'}\n\n"
+        f"THE NEXT BOOK'S OPENING:\n{opening or '(not written yet)'}"
+    )
+    router = get_router(service=STEP_NAME)
+    try:
+        found, _resp = await complete_structured(
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
+            system=system,
+            prompt=prompt,
+            schema=CliffhangerOptions,
+            max_tokens=3000,
+        )
+    except ProviderNotRegistered:
+        return await reject("No writing model is available on this server.")
+    except ValueError as exc:
+        return await reject(f"The recommendations could not be read ({str(exc)[:80]})")
+    options: list[dict[str, Any]] = []
+    for o in found.options[:3]:
+        item: dict[str, Any] = {
+            k: _strip_em_dashes(str(getattr(o, k) or "").strip())
+            for k in ("title", "hook", "scene", "uses", "avoid")
+        }
+        if not item["scene"] or not item["hook"]:
+            continue
+        # A name the book has never used is an invention the author should see before choosing it.
+        item["new_names"] = _new_names(item["scene"] + " " + item["hook"], corpus)
+        options.append(item)
+    if not options:
+        return await reject("The engine could not recommend an ending from this plot structure.")
+    if payload.get("persist"):
+        try:
+            await _store_series_piece(project_id, "cliffhangers", book.get("index"), {"options": options})
+        except Exception as exc:  # noqa: BLE001 - the options still reach the caller
+            logger.warning("series.cliffhangers.not_kept", error=str(exc)[:200])
+    return {"ok": True, "options": options}
+
+
 OPS = {
     "write": _op_write,
     "plan": _op_plan,
@@ -6835,6 +6928,7 @@ OPS = {
     "short-story": _op_short_story,
     "humanize-passage": _op_humanize_passage,
     "suggest-passage-fix": _op_suggest_passage_fix,
+    "recommend-cliffhangers": _op_recommend_cliffhangers,
 }
 
 

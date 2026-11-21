@@ -47,6 +47,22 @@ export interface EndingDraft {
  * it, writes it from the book's craft, arc and cast, and checks it for drift; it waits here until the author has
  * read it, edited it and applied it.
  */
+export interface CliffhangerOption {
+  title: string;
+  hook: string;
+  scene: string;
+  uses: string;
+  avoid: string;
+  new_names?: string[];
+}
+
+/** Ways to end a book, recommended from its plot structure; kept for the author to choose from. */
+export interface CliffhangerSet {
+  options?: CliffhangerOption[];
+  drafted_at?: string;
+  failed?: string;
+}
+
 export interface CodaDraft {
   content_id: string;
   /** Hash of the chapter's text when the scene was written for it: apply refuses if the chapter has moved on. */
@@ -107,6 +123,7 @@ export interface StoredSeries {
   suggested_at?: string;
   endings?: Record<string, EndingDraft>;
   codas?: Record<string, CodaDraft>;
+  cliffhangers?: Record<string, CliffhangerSet>;
   recaps?: Record<string, RecapPiece>;
 }
 
@@ -163,6 +180,7 @@ export function seriesView(outline: Outline | null, projectTitle: string) {
       suggestions: s.suggestions?.[String(b.index)] ?? [],
       ending_draft: s.endings?.[String(b.index)] ?? null,
       coda_draft: s.codas?.[String(b.index)] ?? null,
+      cliffhangers: s.cliffhangers?.[String(b.index)] ?? null,
       recap_draft: s.recaps?.[String(b.index)] ?? null,
     };
   });

@@ -686,6 +686,24 @@ class PassageRewrite(BaseModel):
     text: str = ""
 
 
+class CliffhangerOption(BaseModel):
+    """One way to end a book so the reader needs the next one."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = ""
+    hook: str = ""
+    scene: str = ""
+    uses: str = ""
+    avoid: str = ""
+
+
+class CliffhangerOptions(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    options: list[CliffhangerOption] = Field(default_factory=list)
+
+
 class UnsupportedClaims(BaseModel):
     """Claims in a recap that the source material does not support."""
 

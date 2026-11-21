@@ -1174,3 +1174,66 @@ class TestSuggestPassageFix:
     def test_empty_passage_is_refused(self) -> None:
         out = asyncio.run(M._op_suggest_passage_fix({"passage": "  "}))
         assert out["ok"] is False
+
+
+class TestRecommendCliffhangers:
+    def _setup(self, chapters: None, monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str, dict]]:
+        kept: list[tuple[str, str, dict]] = []
+
+        async def store(project_id: str, bucket: str, index: Any, draft: dict) -> bool:
+            kept.append((bucket, str(index), draft))
+            return True
+
+        monkeypatch.setattr(M, "_store_series_piece", store)
+        return kept
+
+    def test_returns_three_options_keeps_them_and_flags_names_the_book_never_used(
+        self, chapters: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        kept = self._setup(chapters, monkeypatch)
+
+        def opt(t: str, s: str) -> Any:
+            return types.SimpleNamespace(title=t, hook=f"{t} hook", scene=s, uses="ch 1", avoid="ch 31")
+
+        prompts = answer(
+            monkeypatch,
+            types.SimpleNamespace(
+                options=[
+                    opt("A decision", "Marcus stands at the door — and does not knock."),
+                    opt("A fact", "Renata reads a line she did not expect."),
+                    opt("A danger", "Zebediah Quill arrives at the gate."),
+                ]
+            ),
+        )
+        out = asyncio.run(
+            M._op_recommend_cliffhangers(
+                {
+                    "project_id": "p",
+                    "book": {"index": 1, "first_chapter": 0, "last_chapter": 30},
+                    "next_book": {"index": 2, "first_chapter": 31, "last_chapter": 61},
+                    "persist": True,
+                }
+            )
+        )
+        assert out["ok"] is True and len(out["options"]) == 3
+        assert "—" not in out["options"][0]["scene"]
+        assert out["options"][2]["new_names"] and "Quill" in " ".join(out["options"][2]["new_names"])
+        assert kept and kept[0][0] == "cliffhangers" and kept[0][1] == "1"
+        assert "THE NEXT BOOK" in prompts[0]
+
+    def test_refuses_when_the_engine_returns_nothing_usable(
+        self, chapters: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._setup(chapters, monkeypatch)
+        answer(
+            monkeypatch,
+            types.SimpleNamespace(
+                options=[types.SimpleNamespace(title="x", hook="", scene="", uses="", avoid="")]
+            ),
+        )
+        out = asyncio.run(
+            M._op_recommend_cliffhangers(
+                {"project_id": "p", "book": {"index": 1, "first_chapter": 0, "last_chapter": 30}}
+            )
+        )
+        assert out["ok"] is False

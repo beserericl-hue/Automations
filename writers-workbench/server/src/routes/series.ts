@@ -344,6 +344,34 @@ seriesRouter.post('/project/:projectId/series/books/:index/coda', validateBody(D
   }
 });
 
+seriesRouter.post('/project/:projectId/series/books/:index/cliffhangers', async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const outline: Outline = { ...(project.outline ?? {}) };
+  const books = plannedBooks(outline);
+  const index = bookIndex(req);
+  const book = books.find((b) => b.index === index);
+  if (!book) return fail(res, 404, 'NO_SUCH_BOOK', 'That book is not in the current plan.');
+  if (!books.find((b) => b.index === index + 1)) return fail(res, 422, 'LAST_BOOK', 'The last book has no next book to hand the reader to.');
+  const next = books.find((b) => b.index === index + 1);
+  try {
+    const job = await callEngineWriteTool('chapter', {
+      op: 'recommend-cliffhangers',
+      project_id: project.id,
+      user_id: req.userId!,
+      book: range(book),
+      next_book: next ? range(next) : null,
+      persist: true,
+      async: true,
+    });
+    logger.info({ projectId: project.id, index, jobId: job.job_id }, 'series: cliffhanger recommendations queued');
+    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+  } catch (err) {
+    logger.error({ err, projectId: project.id, index }, 'series: cliffhanger recommendations failed to start');
+    fail(res, 502, 'ENGINE', err instanceof Error ? err.message : 'Engine error');
+  }
+});
+
 seriesRouter.post('/project/:projectId/series/books/:index/recap', async (req, res) => {
   const project = await loadProject(req, res);
   if (!project) return;

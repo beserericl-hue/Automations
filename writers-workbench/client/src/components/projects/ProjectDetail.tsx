@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
@@ -27,6 +27,7 @@ import RewriteWithResearchModal from '../content/RewriteWithResearchModal';
 import { useToast } from '../../contexts/ToastContext';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
 import { normalizeOutlineChapter } from '../../types/database';
+import { useBooks, bookOf, BookHeaderRow, BookEndControls } from './BookDivisions';
 
 const TABS = ['overview', 'outline', 'chapters', 'qa', 'bible', 'art', 'social', 'research', 'cost', 'export', 'publish'] as const;
 type Tab = typeof TABS[number];
@@ -1202,6 +1203,7 @@ function ChaptersTab({
     id: string;
     label: string;
   } | null>(null);
+  const { books } = useBooks(projectId);
 
   if (!chapters?.length) {
     return <EmptyState message="No chapters written yet. Use the chat or Eve to write your first chapter." />;
@@ -1237,8 +1239,12 @@ function ChaptersTab({
             const rewriteQueued = rewriteState != null;
             const rewriteError = rewriteState === 'error';
             const hasDrift = ch.chapter_number != null && qaByChapter?.[ch.chapter_number]?.aligned === false;
+            const thisBook = bookOf(books, ch.chapter_number);
+            const startsBook = thisBook && bookOf(books, chapters[i - 1]?.chapter_number)?.index !== thisBook.index;
             return (
-              <tr key={ch.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              <Fragment key={ch.id}>
+              {startsBook && thisBook && <BookHeaderRow book={thisBook} total={books.length} colSpan={7} />}
+              <tr className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {chapterDisplay}
                 </td>
@@ -1330,8 +1336,20 @@ function ChaptersTab({
                       );
                     })()}
                   </div>
+                  {thisBook && ch.chapter_number != null && (
+                    <div className="mt-1.5">
+                      <BookEndControls
+                        projectId={projectId}
+                        chapterNumber={ch.chapter_number}
+                        books={books}
+                        userId={userId}
+                        trackJob={jobQueue.trackJob}
+                      />
+                    </div>
+                  )}
                 </td>
               </tr>
+              </Fragment>
             );
           })}
         </tbody>
