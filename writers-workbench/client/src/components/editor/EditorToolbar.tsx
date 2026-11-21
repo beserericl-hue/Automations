@@ -3,9 +3,11 @@ import type { Editor } from '@tiptap/react';
 interface EditorToolbarProps {
   editor: Editor;
   onSave: () => void;
+  onFormatBlock?: () => void;
+  formatOpen?: boolean;
 }
 
-export default function EditorToolbar({ editor, onSave }: EditorToolbarProps) {
+export default function EditorToolbar({ editor, onSave, onFormatBlock, formatOpen }: EditorToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-1 border border-b-0 border-gray-200 rounded-t-lg bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
       {/* Text formatting */}
@@ -97,6 +99,19 @@ export default function EditorToolbar({ editor, onSave }: EditorToolbarProps) {
       >
         —
       </ToolbarButton>
+
+      <Divider />
+
+      {/* A letter, a poem, an epigraph: its own look for the selected paragraphs. */}
+      {onFormatBlock ? (
+        <ToolbarButton
+          active={Boolean(formatOpen) || editor.isActive('formatBlock')}
+          onClick={onFormatBlock}
+          title="Format block: set the selected paragraphs apart in their own font, size and spacing"
+        >
+          <span className="text-xs font-medium">Format block</span>
+        </ToolbarButton>
+      ) : null}
 
       <Divider />
 
