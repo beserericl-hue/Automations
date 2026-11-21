@@ -236,6 +236,18 @@ describe('closing scene and recap', () => {
     await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/books/1/coda/apply'))).toBe(true));
   });
 
+  it('adds a scene the check objects to only after the author confirms having read it', async () => {
+    mockFetch.mockImplementation(async () => ({ success: true, data: { series: WITH_CODA } }) as never);
+    render({ ...WITH_CODA, books: [{ ...WITH_CODA.books[0], coda_draft: { ...CODA, problems: ['page 211 does not exist'] } }, SERIES.books[1]] });
+    expect(screen.getByTestId('coda-1-apply')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('coda-1-anyway'));
+    // Not yet: the confirmation has to be ticked first.
+    expect(screen.getByTestId('coda-1-anyway-go')).toBeDisabled();
+    fireEvent.click(document.getElementById('coda-1-read-it') as HTMLElement);
+    fireEvent.click(screen.getByTestId('coda-1-anyway-go'));
+    await waitFor(() => expect(bodyOf('/books/1/coda/apply', 'POST')).toEqual({ override: true }));
+  });
+
   it('shows a closing scene already in the book as read-only', () => {
     render({ ...WITH_CODA, books: [{ ...WITH_CODA.books[0], coda_draft: { ...CODA, applied_at: '2026-11-14T13:00:00Z' } }, SERIES.books[1]] });
     expect(screen.getByText(/In the book since/)).toBeInTheDocument();
