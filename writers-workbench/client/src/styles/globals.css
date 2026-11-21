@@ -61,3 +61,13 @@
 @media (prefers-reduced-motion: reduce) {
   .ProseMirror .reveal-highlight { animation: none; }
 }
+
+/* The editor's find box: every match, and a stronger mark on the one being looked at. */
+.ProseMirror .find-match {
+  background-color: rgba(96, 165, 250, 0.30);
+  border-radius: 2px;
+}
+.ProseMirror .find-match.find-current {
+  background-color: rgba(250, 204, 21, 0.60);
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.60);
+}
