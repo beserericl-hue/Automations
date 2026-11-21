@@ -199,7 +199,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
       setFindIndex(current);
       if (scroll && ranges.length) {
         requestAnimationFrame(() => {
-          editor.view.dom.querySelector('.find-current')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          editor.view.dom.querySelector('.find-current')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
         });
       }
     },
