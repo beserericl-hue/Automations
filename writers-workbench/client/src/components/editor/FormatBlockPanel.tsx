@@ -60,7 +60,7 @@ export default function FormatBlockPanel({ editor }: { editor: Editor }) {
   const { from, to } = editor.state.selection;
   const selected = from === to ? '' : editor.state.doc.textBetween(from, to, '\n\n').trim();
   const sample = (inBlock ? editor.state.selection.$from.parent.textContent : selected) || 'Dear Marcus, I am writing about the box.';
-  const preview = sample.length > 220 ? `${sample.slice(0, 220)}…` : sample;
+  const preview = sample.length > 140 ? `${sample.slice(0, 140)}…` : sample;
 
   const apply = () => {
     const ok = editor.chain().focus().setFormatBlock({ ...draft, ...(name && presets.some((p) => p.name === name) ? { preset: name } : {}) }).run();
@@ -84,11 +84,11 @@ export default function FormatBlockPanel({ editor }: { editor: Editor }) {
   };
 
   return (
-    <div data-testid="format-block-panel" className="space-y-3 border border-t-0 border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+    <div data-testid="format-block-panel" className="space-y-2 border border-t-0 border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
       <p className="text-xs text-gray-600 dark:text-gray-400">
         {inBlock ? 'Editing the block your cursor is in. Changes show in the chapter as you make them.' : 'Select the paragraphs to set apart, choose a look, then make them a block.'}
       </p>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <label className={field}>
           Font
           <select aria-label="Block font" className={input} value={current.font} onChange={(e) => change({ font: e.target.value as BlockStyle['font'] })}>
@@ -124,7 +124,7 @@ export default function FormatBlockPanel({ editor }: { editor: Editor }) {
         </label>
       </div>
 
-      <div data-testid="format-block-preview" className="rounded border border-dashed border-gray-300 bg-gray-50 px-3 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+      <div data-testid="format-block-preview" className="max-h-24 overflow-y-auto rounded border border-dashed border-gray-300 bg-gray-50 px-3 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
         <div style={Object.fromEntries(blockCss(current).split(';').map((d) => { const [k, ...v] = d.split(':'); return [k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()), v.join(':')]; }))}>{preview}</div>
       </div>
 
