@@ -22,6 +22,7 @@ import BlogWebPublish from './BlogWebPublish';
 import SocialFromContent from './SocialFromContent';
 import RewriteWithResearchModal from './RewriteWithResearchModal';
 import { useToast } from '../../contexts/ToastContext';
+import { ChapterBookBanner } from '../projects/BookDivisions';
 import { useChapterRepair } from '../../hooks/useChapterRepair';
 import { useImageGenerator } from '../../hooks/useImageGenerator';
 import type { PublishedContent, GeneratedImage } from '../../types/database';
@@ -441,6 +442,11 @@ export default function ContentDetail() {
               ID: {item.id.substring(0, 8)}
             </span>
           </div>
+          {item.project_id && item.chapter_number != null && item.content_type === 'chapter' && (
+            <div className="mt-2">
+              <ChapterBookBanner projectId={item.project_id} chapterNumber={item.chapter_number} userId={userId} />
+            </div>
+          )}
         </div>
 
         {/* Status + actions */}

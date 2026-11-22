@@ -174,6 +174,18 @@ export default function BookEndingReview() {
                   <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{o.scene}</p>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Relies on: {o.uses}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">Leaves alone: {o.avoid}</p>
+                  {o.problems?.length ? (
+                    <div data-testid="option-problems" className="mt-1 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+                      The check against the next book found:
+                      <ul className="ml-4 list-disc">
+                        {o.problems.map((x) => (
+                          <li key={x}>{x}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-700 dark:text-green-400">Checked against the whole next book: no conflict found.</p>
+                  )}
                   {o.new_names?.length ? (
                     <p className="text-xs text-amber-700 dark:text-amber-400">Names not in the book yet: {o.new_names.join(', ')}</p>
                   ) : null}

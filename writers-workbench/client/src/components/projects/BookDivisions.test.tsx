@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, waitFor, fireEvent } from '../../test/test-utils';
 import { apiFetch } from '../../lib/api';
-import { BookHeaderRow, BookEndControls, bookOf } from './BookDivisions';
+import { BookHeaderRow, BookEndControls, ChapterBookBanner, bookOf } from './BookDivisions';
 import type { SeriesBook } from '../publishing/SeriesPanel';
 
 vi.mock('../../lib/api', async (importOriginal) => ({
@@ -76,5 +76,38 @@ describe('book divisions in the chapter list', () => {
     fireEvent.click(screen.getByTestId('break-confirm-59'));
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
     expect(JSON.parse(String((mockFetch.mock.calls[0][1] as { body: string }).body)).breaks).toEqual([29]);
+  });
+});
+
+describe('the book banner on a chapter\'s own page', () => {
+  const serve = () =>
+    mockFetch.mockImplementation(async (path: string) =>
+      String(path) === '/api/publishing/project/p1' ? ({ success: true, data: { series: { name: 'S', books: BOOKS } } } as never) : ({ jobId: 'j1' } as never),
+    );
+
+  it('says which book the chapter is in, and offers to end a book here', async () => {
+    serve();
+    renderWithProviders(<ChapterBookBanner projectId="p1" chapterNumber={12} />);
+    const banner = await screen.findByTestId('chapter-book-banner');
+    expect(banner).toHaveTextContent('Book 1 of 3');
+    expect(banner).toHaveTextContent('Book 1 title');
+    expect(banner).toHaveTextContent('chapters 0 to 29');
+    expect(screen.getByTestId('break-toggle-12')).toBeInTheDocument();
+    expect(screen.queryByTestId('review-ending-1')).toBeNull();
+  });
+
+  it('on the last chapter of a book, says so and links to the ending review', async () => {
+    serve();
+    renderWithProviders(<ChapterBookBanner projectId="p1" chapterNumber={29} />);
+    const banner = await screen.findByTestId('chapter-book-banner');
+    expect(banner).toHaveTextContent('this chapter ends the book');
+    expect(screen.getByTestId('review-ending-1')).toHaveAttribute('href', '/projects/p1/books/1/ending');
+  });
+
+  it('shows nothing for a manuscript that is one book', async () => {
+    mockFetch.mockImplementation(async () => ({ success: true, data: { series: { name: 'S', books: [BOOKS[0]] } } }) as never);
+    const { container } = renderWithProviders(<ChapterBookBanner projectId="p1" chapterNumber={12} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    expect(container.querySelector('[data-testid="chapter-book-banner"]')).toBeNull();
   });
 });
