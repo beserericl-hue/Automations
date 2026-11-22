@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { renderWithProviders, screen, waitFor, fireEvent } from '../../test/test-utils';
@@ -13,7 +13,17 @@ vi.mock('../../lib/api', async (importOriginal) => ({
 }));
 const mockFetch = vi.mocked(apiFetch);
 
-const make = (content: string) => new Editor({ extensions: [StarterKit, FormatBlock], content });
+// Every editor made here is destroyed after its test: a live editor keeps timers that can fire once the
+// test environment is gone, and the error then lands on whichever test file is running.
+const made: Editor[] = [];
+const make = (content: string) => {
+  const ed = new Editor({ extensions: [StarterKit, FormatBlock], content });
+  made.push(ed);
+  return ed;
+};
+afterEach(() => {
+  while (made.length) made.pop()!.destroy();
+});
 /** The saved HTML as a document, so the checks are on what is there and not on how it is spelled. */
 const dom = (html: string): HTMLElement => {
   const d = document.createElement('div');
