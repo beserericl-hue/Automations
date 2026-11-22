@@ -50,12 +50,13 @@ describe('reviewing how a book ends', () => {
   });
 
   it('asks the engine to recommend cliffhangers and lists what comes back, with what each leaves alone', async () => {
-    serve(book({ cliffhangers: { options: [{ title: 'A decision', hook: 'Will she file?', scene: 'Adaeze alone.', uses: 'ch 25', avoid: 'ch 35 hearing', new_names: ['Quill'] }] } }));
+    serve(book({ cliffhangers: { options: [{ title: 'A decision', hook: 'Will she file?', scene: 'Adaeze alone.', uses: 'ch 25', avoid: 'ch 35 hearing', new_names: ['Quill'], problems: ['chapter 65 shows this email first'] }] } }));
     renderWithProviders(<BookEndingReview />);
     fireEvent.click(await screen.findByTestId('recommend'));
     await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/books/1/cliffhangers'))).toBe(true));
     expect(screen.getByTestId('cliffhanger-option')).toHaveTextContent('Leaves alone: ch 35 hearing');
     expect(screen.getByTestId('cliffhanger-option')).toHaveTextContent('Names not in the book yet: Quill');
+    expect(screen.getByTestId('option-problems')).toHaveTextContent('chapter 65 shows this email first');
   });
 
   it('drafts the closing scene from the chosen cliffhanger', async () => {

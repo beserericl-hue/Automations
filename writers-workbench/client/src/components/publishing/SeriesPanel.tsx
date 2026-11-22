@@ -36,6 +36,8 @@ export interface CliffhangerOption {
   uses: string;
   avoid: string;
   new_names?: string[];
+  /** What the next book contradicts or has already shown; empty when the option passed the check. */
+  problems?: string[];
 }
 
 export interface SeriesBook {

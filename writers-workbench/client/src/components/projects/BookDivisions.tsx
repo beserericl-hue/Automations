@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import type { SeriesBook, SeriesView } from '../publishing/SeriesPanel';
 
 interface PublishingSlice {
@@ -135,6 +136,35 @@ export function BookEndControls({
           {endsBook ? `Ends Book ${endsBook.index} · change` : 'End a book here'}
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * On the chapter's own page: which book it is in, and, when it is the book's last chapter, how that book
+ * ends. The same controls as the chapter list, so the author can decide where a book ends and review
+ * how it ends from the chapter they are reading.
+ */
+export function ChapterBookBanner({ projectId, chapterNumber, userId }: { projectId: string; chapterNumber: number; userId?: string }) {
+  const { books } = useBooks(projectId);
+  const { trackJob } = useEngineJobQueue(userId, projectId);
+  const book = bookOf(books, chapterNumber);
+  if (!book) return null;
+  const endsBook = book.last_chapter === chapterNumber && book.index < books.length;
+  return (
+    <div
+      data-testid="chapter-book-banner"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs dark:border-brand-900 dark:bg-brand-950/40"
+    >
+      <span className="font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">
+        Book {book.index} of {books.length}
+      </span>
+      <span className="font-medium text-gray-900 dark:text-white">{book.title || 'Untitled book'}</span>
+      <span className="text-gray-500 dark:text-gray-400">
+        chapters {book.first_chapter} to {book.last_chapter}
+        {endsBook ? ' · this chapter ends the book' : ''}
+      </span>
+      <BookEndControls projectId={projectId} chapterNumber={chapterNumber} books={books} userId={userId} trackJob={trackJob} />
     </div>
   );
 }

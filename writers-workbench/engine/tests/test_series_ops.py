@@ -1177,7 +1177,7 @@ class TestSuggestPassageFix:
 
 
 class TestRecommendCliffhangers:
-    def _setup(self, chapters: None, monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str, dict]]:
+    def _setup(self, monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str, dict]]:
         kept: list[tuple[str, str, dict]] = []
 
         async def store(project_id: str, bucket: str, index: Any, draft: dict) -> bool:
@@ -1187,25 +1187,23 @@ class TestRecommendCliffhangers:
         monkeypatch.setattr(M, "_store_series_piece", store)
         return kept
 
-    def test_returns_three_options_keeps_them_and_flags_names_the_book_never_used(
-        self, chapters: None, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        kept = self._setup(chapters, monkeypatch)
+    @staticmethod
+    def _judge(monkeypatch: pytest.MonkeyPatch, bad: str = "Quill") -> list[str]:
+        seen: list[str] = []
 
-        def opt(t: str, s: str) -> Any:
-            return types.SimpleNamespace(title=t, hook=f"{t} hook", scene=s, uses="ch 1", avoid="ch 31")
+        async def fake(_router: Any, _model: str, **k: Any) -> tuple[list[str], list[str]]:
+            seen.append(k["text"])
+            return ([f"the next book already shows {bad} later"] if bad in k["text"] else []), []
 
-        prompts = answer(
-            monkeypatch,
-            types.SimpleNamespace(
-                options=[
-                    opt("A decision", "Marcus stands at the door — and does not knock."),
-                    opt("A fact", "Renata reads a line she did not expect."),
-                    opt("A danger", "Zebediah Quill arrives at the gate."),
-                ]
-            ),
-        )
-        out = asyncio.run(
+        monkeypatch.setattr(M, "_coda_continuity", fake)
+        return seen
+
+    @staticmethod
+    def _opt(t: str, s: str) -> Any:
+        return types.SimpleNamespace(title=t, hook=f"{t} hook", scene=s, uses="ch 1", avoid="ch 31")
+
+    def _run(self) -> dict:
+        return asyncio.run(
             M._op_recommend_cliffhangers(
                 {
                     "project_id": "p",
@@ -1215,25 +1213,54 @@ class TestRecommendCliffhangers:
                 }
             )
         )
-        assert out["ok"] is True and len(out["options"]) == 3
-        assert "—" not in out["options"][0]["scene"]
-        assert out["options"][2]["new_names"] and "Quill" in " ".join(out["options"][2]["new_names"])
+
+    def test_reads_every_candidate_against_the_next_book_and_offers_the_clean_ones_first(
+        self, chapters: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        kept = self._setup(monkeypatch)
+        seen = self._judge(monkeypatch)
+        prompts = answer(
+            monkeypatch,
+            types.SimpleNamespace(
+                options=[
+                    self._opt("A danger", "Zebediah Quill arrives at the gate."),
+                    self._opt("A decision", "Marcus stands at the door \u2014 and does not knock."),
+                    self._opt("A fact", "Renata reads a line she did not expect."),
+                    self._opt("A call", "Sylvia lets the phone ring."),
+                ]
+            ),
+        )
+        out = self._run()
+        assert out["ok"] is True
+        assert [o["title"] for o in out["options"]] == ["A decision", "A fact", "A call"]
+        assert all(o["problems"] == [] for o in out["options"])
+        assert len(seen) == 4  # every candidate was judged, including the one that failed
+        assert "\u2014" not in out["options"][0]["scene"]
         assert kept and kept[0][0] == "cliffhangers" and kept[0][1] == "1"
         assert "THE NEXT BOOK" in prompts[0]
+
+    def test_shows_a_flagged_option_with_its_problem_when_none_is_clean(
+        self, chapters: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._setup(monkeypatch)
+        self._judge(monkeypatch)
+        answer(
+            monkeypatch,
+            types.SimpleNamespace(options=[self._opt("A danger", "Zebediah Quill arrives at the gate.")]),
+        )
+        out = self._run()
+        assert out["ok"] is True
+        assert out["options"][0]["problems"] == ["the next book already shows Quill later"]
+        assert "Quill" in " ".join(out["options"][0]["new_names"])
 
     def test_refuses_when_the_engine_returns_nothing_usable(
         self, chapters: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        self._setup(chapters, monkeypatch)
+        self._setup(monkeypatch)
         answer(
             monkeypatch,
             types.SimpleNamespace(
                 options=[types.SimpleNamespace(title="x", hook="", scene="", uses="", avoid="")]
             ),
         )
-        out = asyncio.run(
-            M._op_recommend_cliffhangers(
-                {"project_id": "p", "book": {"index": 1, "first_chapter": 0, "last_chapter": 30}}
-            )
-        )
-        assert out["ok"] is False
+        assert self._run()["ok"] is False

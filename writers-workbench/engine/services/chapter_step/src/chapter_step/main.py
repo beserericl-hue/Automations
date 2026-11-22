@@ -6844,13 +6844,13 @@ async def _op_recommend_cliffhangers(payload: dict) -> dict:
     opening = str(nrows[0].get("content_text") or "")[:BOOK_ENDING_NEXT_OPENING_CHARS] if nrows else ""
     corpus = "\n".join(str(r.get("content_text") or "") for r in rows)
     system = (
-        "You are a series editor. Recommend THREE different cliffhanger endings for the end of one book in a "
+        "You are a series editor. Recommend FIVE different cliffhanger endings for the end of one book in a "
         "novel series, so that a reader finishing it has to read the next. Read the plot structure below: what "
         "this book set going and has not settled, and what the next book does with it.\n"
         "Rules:\n"
         "- Each ending is a present-day scene in the frame story, after the book's last chapter and before the "
-        "next book begins. Three that differ in kind (for example: a person's decision, a fact someone learns, "
-        "a danger arriving), not three versions of one idea.\n"
+        "next book begins. Five that differ in kind (for example: a person's decision, a fact someone learns, "
+        "a danger arriving), not versions of one idea.\n"
         "- Use only what the book and the outline already establish. Invent no person, place, document, number or "
         "rule. If an ending needs a fact that is not in the book, do not recommend it.\n"
         "- It must end before the next book begins and leave untouched whatever the next book's opening chapters "
@@ -6883,8 +6883,8 @@ async def _op_recommend_cliffhangers(payload: dict) -> dict:
         return await reject("No writing model is available on this server.")
     except ValueError as exc:
         return await reject(f"The recommendations could not be read ({str(exc)[:80]})")
-    options: list[dict[str, Any]] = []
-    for o in found.options[:3]:
+    candidates: list[dict[str, Any]] = []
+    for o in found.options[:6]:
         item: dict[str, Any] = {
             k: _strip_em_dashes(str(getattr(o, k) or "").strip())
             for k in ("title", "hook", "scene", "uses", "avoid")
@@ -6893,9 +6893,49 @@ async def _op_recommend_cliffhangers(payload: dict) -> dict:
             continue
         # A name the book has never used is an invention the author should see before choosing it.
         item["new_names"] = _new_names(item["scene"] + " " + item["hook"], corpus)
-        options.append(item)
-    if not options:
+        candidates.append(item)
+    if not candidates:
         return await reject("The engine could not recommend an ending from this plot structure.")
+
+    # Every candidate is read against the whole of the next book before it is offered: its outline chapter by
+    # chapter and the text of its opening chapters, the same check a drafted closing scene has to pass. A
+    # recommendation that the next book contradicts or has already shown wastes the author's time (the first
+    # version offered one that chapter 65 contradicted, because only the opening was in front of it).
+    opening_rows: list[dict] = []
+    for r in [*nrows[:1], *_frame_rows(outline, nrows, act)[:2]]:
+        if r not in opening_rows:
+            opening_rows.append(r)
+    roster_text = _roster_text(ctx.get("roster") or [])
+    next_for_check = next_all or _outline_range_rows(outline, nxt, act)
+
+    async def judge(item: dict[str, Any]) -> list[str]:
+        try:
+            problems, _existing = await _coda_continuity(
+                router,
+                get_settings().model_default,
+                text=item["scene"],
+                outline=outline,
+                frame=frame,
+                next_book=next_for_check,
+                opening_rows=opening_rows,
+                tail=tail,
+                roster_text=roster_text,
+                unknown_terms=_new_names(item["scene"], corpus + "\n" + opening),
+                canon="",
+            )
+            return problems
+        except Exception as exc:  # noqa: BLE001 - an unchecked option is shown as such, not hidden
+            logger.warning("series.cliffhangers.check_failed", error=str(exc)[:160])
+            return ["This option could not be checked against the next book."]
+
+    verdicts = await asyncio.gather(*(judge(c) for c in candidates))
+    for c, problems in zip(candidates, verdicts, strict=True):
+        c["problems"] = problems
+    clean = [c for c in candidates if not c["problems"]]
+    flagged = [c for c in candidates if c["problems"]]
+    options = (clean + flagged)[:3]
+    if not clean:
+        logger.info("series.cliffhangers.none_clean", candidates=len(candidates))
     if payload.get("persist"):
         try:
             await _store_series_piece(project_id, "cliffhangers", book.get("index"), {"options": options})
