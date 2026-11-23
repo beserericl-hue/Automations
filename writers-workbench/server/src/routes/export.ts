@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { buildEpub, epubFilename, type EpubChapter } from '../lib/epub.js';
 import { composeCover } from '../lib/cover.js';
 import { buildKdpPackage } from '../lib/kdp-package.js';
+import { buildManuscriptDraft, buildOutlineDraft, type DraftChapter } from '../lib/draft-docx.js';
 import { loadBookSource } from '../lib/book-source.js';
 import { downloadCover, findCover } from '../lib/book-cover.js';
 
@@ -178,6 +179,75 @@ exportRouter.post('/docx', requireAuth, requireTierFeature('kdp_export'), valida
   } catch (error) {
     logger.error({ err: error }, 'Export error');
     res.status(500).json({ error: 'Failed to generate document' });
+  }
+});
+
+/**
+ * @openapi
+ * /export/project/{id}/draft/{part}:
+ *   get:
+ *     tags: [Export]
+ *     summary: A hard-copy draft as a .docx (not a publishing export)
+ *     description: >
+ *       part=outline: the outline and every chapter's outline. part=manuscript: the chapter titles listed,
+ *       then every chapter in full, whatever its status.
+ */
+exportRouter.get('/project/:id/draft/:part', requireAuth, async (req, res) => {
+  const part = String(req.params.part);
+  if (part !== 'outline' && part !== 'manuscript') {
+    res.status(400).json({ success: false, error: { code: 'BAD_PART', message: 'part must be outline or manuscript' } });
+    return;
+  }
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: project } = await supabase
+      .from('writing_projects_v2')
+      .select('title, outline')
+      .eq('id', String(req.params.id))
+      .eq('user_id', req.userId!)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!project) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
+      return;
+    }
+    let buffer: Buffer;
+    if (part === 'outline') {
+      const hasOutline = Boolean(project.outline && (project.outline as Record<string, unknown>).chapters);
+      if (!hasOutline) {
+        res.status(422).json({ success: false, error: { code: 'NO_OUTLINE', message: 'This project has no outline yet.' } });
+        return;
+      }
+      buffer = await buildOutlineDraft({ title: project.title, outline: project.outline as Record<string, unknown> });
+    } else {
+      const chapters: DraftChapter[] = [];
+      for (let page = 0; ; page += 1) {
+        const { data, error } = await supabase
+          .from('published_content_v2')
+          .select('title, chapter_number, content_text')
+          .eq('project_id', String(req.params.id))
+          .eq('user_id', req.userId!)
+          .eq('content_type', 'chapter')
+          .is('deleted_at', null)
+          .order('chapter_number', { ascending: true })
+          .range(page * 1000, page * 1000 + 999);
+        if (error) throw new Error(error.message);
+        chapters.push(...((data ?? []) as DraftChapter[]));
+        if ((data ?? []).length < 1000) break;
+      }
+      if (!chapters.some((c) => (c.content_text ?? '').trim())) {
+        res.status(422).json({ success: false, error: { code: 'NO_CHAPTERS', message: 'This project has no chapters with text yet.' } });
+        return;
+      }
+      buffer = await buildManuscriptDraft({ title: project.title, outline: project.outline as Record<string, unknown> | null }, chapters);
+    }
+    const base = String(project.title).replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'project';
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${base}_${part}_draft.docx"`);
+    res.send(buffer);
+  } catch (err) {
+    logger.error({ err, userId: req.userId }, 'export: draft failed');
+    res.status(500).json({ success: false, error: { code: 'DRAFT_FAILED', message: 'Could not build the draft document.' } });
   }
 });
 

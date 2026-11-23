@@ -28,6 +28,7 @@ import { useToast } from '../../contexts/ToastContext';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
 import { normalizeOutlineChapter } from '../../types/database';
 import { useBooks, bookOf, BookHeaderRow, BookEndControls } from './BookDivisions';
+import ExportDraftButton from './ExportDraftButton';
 
 const TABS = ['overview', 'outline', 'chapters', 'qa', 'bible', 'art', 'social', 'research', 'cost', 'export', 'publish'] as const;
 type Tab = typeof TABS[number];
@@ -745,6 +746,9 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, use
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <ExportDraftButton projectId={projectId} part="outline" />
+      </div>
       {/* Book-level outline overview */}
       {(outline.premise || outline.characters?.length || outline.themes?.length) && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
@@ -1210,6 +1214,10 @@ function ChaptersTab({
   }
 
   return (
+    <div className="space-y-2">
+    <div className="flex justify-end">
+      <ExportDraftButton projectId={projectId} part="manuscript" />
+    </div>
     <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
       <table className="w-full">
         <thead>
@@ -1399,6 +1407,7 @@ function ChaptersTab({
           onClose={() => setRewriteResearchTarget(null)}
         />
       )}
+    </div>
     </div>
   );
 }
