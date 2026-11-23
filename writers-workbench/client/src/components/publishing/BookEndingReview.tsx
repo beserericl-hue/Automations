@@ -44,6 +44,8 @@ export default function BookEndingReview() {
   const stateKey = ['publishing', projectId] as const;
   const base = `/api/publishing/project/${projectId}/series`;
   const [chosen, setChosen] = useState<string>('');
+  // An option whose button was pressed while a saved draft exists: replacing it needs a second, informed press.
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [humanized, setHumanized] = useState<HumanizeResult | null>(null);
 
   const { data } = useQuery({
@@ -89,6 +91,23 @@ export default function BookEndingReview() {
   const recommending = stateOf(`${projectId}:cliffhangers:${index}`) === 'queued';
 
   const draft = book?.coda_draft && !book.coda_draft.failed ? book.coda_draft : null;
+  const writing = stateOf(`${projectId}:coda:${index}`) === 'queued';
+
+  // The button on a cliffhanger starts the writing: the engine drafts the closing scene from that option's
+  // direction, with the same research, drift and continuity checks as any closing scene. Nothing is added to
+  // the book; the draft appears in step 3 to read, edit and add.
+  const writeFrom = useMutation({
+    mutationFn: async (direction: string) =>
+      (await apiFetch<{ jobId?: string }>(`${base}/books/${index}/coda`, { method: 'POST', body: JSON.stringify({ direction }) })).jobId,
+    onSuccess: (jobId, direction) => {
+      setChosen(direction);
+      setConfirming(null);
+      if (jobId) trackJob(`${projectId}:coda:${index}`, jobId, [stateKey]);
+      addToast('Writing the closing scene from that cliffhanger. It takes about five minutes; you can leave this page, and it will be in step 3 when it is done.', 'success');
+      document.getElementById('closing-scene')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    },
+    onError: (err) => addToast(messageOf(err), 'error'),
+  });
   const humanize = useMutation({
     mutationFn: async () =>
       (await apiFetch<ApiEnvelope<HumanizeResult>>(`/api/content/${last!.id}/humanize`, { method: 'POST', body: JSON.stringify({ text: draft!.text }) })).data!,
@@ -136,8 +155,18 @@ export default function BookEndingReview() {
         </p>
       </div>
 
+      <section data-testid="how-it-works" className="rounded-lg border border-brand-200 bg-brand-50 p-4 text-sm text-gray-800 dark:border-brand-900 dark:bg-brand-950/40 dark:text-gray-200">
+        <p className="font-medium">How this screen works</p>
+        <ol className="mt-1 list-decimal space-y-0.5 pl-5">
+          <li>Read how the book ends now.</li>
+          <li>Ask for cliffhangers. They are suggestions; nothing changes in your book.</li>
+          <li>Press "Write the closing scene from this" on the one you like. The engine writes a closing scene (the epilogue) that continues the story after chapter {book.last_chapter}.</li>
+          <li>Read it, edit it, run it through the humanizer, check it against the next book. Your book changes only when you press "Add it to the book", which puts the scene at the end of chapter {book.last_chapter} and keeps a restore point.</li>
+        </ol>
+      </section>
+
       <section className={card}>
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">How it ends now</h2>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">1. How it ends now</h2>
         <p data-testid="ending-tail" className="mt-2 whitespace-pre-wrap font-serif text-sm text-gray-800 dark:text-gray-200">…{tail}</p>
         {book.ending_reason ? <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">The planner's reading: {book.ending_reason}</p> : null}
         {book.ending_resolves || book.ending_carries ? (
@@ -157,7 +186,7 @@ export default function BookEndingReview() {
         <>
           <section className={card}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Recommended cliffhangers</h2>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">2. Recommended cliffhangers</h2>
               <button data-testid="recommend" className={primary} onClick={() => recommend.mutate()} disabled={recommend.isPending || recommending}>
                 {recommending ? 'Reading the plot…' : options.length ? 'Recommend again' : 'Recommend cliffhangers'}
               </button>
@@ -189,23 +218,41 @@ export default function BookEndingReview() {
                   {o.new_names?.length ? (
                     <p className="text-xs text-amber-700 dark:text-amber-400">Names not in the book yet: {o.new_names.join(', ')}</p>
                   ) : null}
-                  <button
-                    className={`${chosen === o.scene ? primary : button} mt-2`}
-                    onClick={() => setChosen(o.scene)}
-                    data-testid="use-direction"
-                  >
-                    {chosen === o.scene ? 'Chosen: draft from this' : 'Draft the closing scene from this'}
-                  </button>
+                  {confirming === o.scene ? (
+                    <div className="mt-2 space-y-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                      <p>You have a saved closing scene for this book (with any edits you made). Writing a new one replaces it.</p>
+                      <div className="flex gap-2">
+                        <button data-testid="confirm-write" className={primary} onClick={() => writeFrom.mutate(o.scene)} disabled={writeFrom.isPending}>
+                          Replace it and write from this
+                        </button>
+                        <button className={button} onClick={() => setConfirming(null)}>Keep my saved scene</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className={`${chosen === o.scene && writing ? button : primary} mt-2`}
+                      onClick={() => (draft && !draft.applied_at ? setConfirming(o.scene) : writeFrom.mutate(o.scene))}
+                      disabled={writeFrom.isPending || writing}
+                      data-testid="use-direction"
+                    >
+                      {chosen === o.scene && writing ? 'Writing the closing scene…' : writeFrom.isPending ? 'Starting…' : 'Write the closing scene from this'}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
           </section>
 
-          <section className={card}>
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Closing scene (epilogue)</h2>
+          <section id="closing-scene" className={card}>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">3. Closing scene (epilogue)</h2>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Picks up where chapter {book.last_chapter} stops and ends on the cliffhanger. Edit it, check it against the books around it, then add it.
             </p>
+            {writing ? (
+              <p data-testid="writing-banner" className="mt-2 rounded border border-brand-200 bg-brand-50 p-2 text-xs text-brand-900 dark:border-brand-900 dark:bg-brand-950/40 dark:text-brand-100">
+                The engine is writing the closing scene now (research, drift check, continuity check). This takes about five minutes. You can leave this page; it will be here when it is done.
+              </p>
+            ) : null}
             <div className="mt-2">
               <SeriesPiece
                 kind="coda"
@@ -225,7 +272,7 @@ export default function BookEndingReview() {
 
           {draft && !draft.applied_at ? (
             <section className={card} data-testid="humanizer-box">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Humanizer</h2>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">4. Humanizer</h2>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Runs the saved draft through the humanizer. You read the result before it replaces anything.
               </p>

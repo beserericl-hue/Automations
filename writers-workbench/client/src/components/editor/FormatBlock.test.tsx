@@ -123,4 +123,10 @@ describe('the formatting-block panel', () => {
     const preview = screen.getByTestId('format-block-preview').firstElementChild as HTMLElement;
     expect(preview.style.textAlign).toBe('center');
   });
+
+  it('says plainly how far the editor matches the exports', () => {
+    const ed = make('<p>Hello there.</p>');
+    renderWithProviders(<FormatBlockPanel editor={ed as never} />);
+    expect(screen.getByTestId('format-block-note')).toHaveTextContent('Handwriting and italic print in the book');
+  });
 });

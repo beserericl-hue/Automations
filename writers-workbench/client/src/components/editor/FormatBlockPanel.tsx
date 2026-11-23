@@ -124,6 +124,9 @@ export default function FormatBlockPanel({ editor }: { editor: Editor }) {
         </label>
       </div>
 
+      <p data-testid="format-block-note" className="text-[11px] text-gray-500 dark:text-gray-400">
+        The chapter shows the block as you set it. EPUB readers choose their own fonts. In the printed PDF, Serif, Sans and Typewriter print as chosen; Handwriting and italic print in the book's serif.
+      </p>
       <div data-testid="format-block-preview" className="max-h-24 overflow-y-auto rounded border border-dashed border-gray-300 bg-gray-50 px-3 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
         <div style={Object.fromEntries(blockCss(current).split(';').map((d) => { const [k, ...v] = d.split(':'); return [k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()), v.join(':')]; }))}>{preview}</div>
       </div>
