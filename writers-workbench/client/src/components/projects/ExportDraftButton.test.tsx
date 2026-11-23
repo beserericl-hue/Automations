@@ -50,11 +50,13 @@ describe('Export Draft', () => {
     fireEvent.click(screen.getByTestId('export-draft-book-3'));
     fireEvent.click(screen.getByTestId('export-draft-book-1'));
     fireEvent.click(screen.getByTestId('export-draft-selected'));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(fetchMock.mock.calls[1][0]).toBe('/api/export/project/p1/draft/manuscript?books=1,3');
+    // Two books chosen: two requests, one Word file each.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/export/project/p1/draft/manuscript?books=1');
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/export/project/p1/draft/manuscript?books=3');
     fireEvent.click(screen.getByTestId('export-draft-manuscript'));
     fireEvent.click(screen.getByTestId('export-draft-all'));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
-    expect(fetchMock.mock.calls[2][0]).toBe('/api/export/project/p1/draft/manuscript');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    expect(fetchMock.mock.calls[3][0]).toBe('/api/export/project/p1/draft/manuscript');
   });
 });

@@ -26,33 +26,45 @@ export default function ExportDraftButton({ projectId, part, books = [] }: { pro
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<number[]>([]);
 
-  /** Build and download the draft; `only` limits the manuscript to those books of the series. */
+  /** Build and download one Word file. `book` limits the manuscript to that one book of the series. */
+  const fetchOne = async (book?: number) => {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    const res = await fetch(`/api/export/project/${projectId}/draft/${part}${book ? `?books=${book}` : ''}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } | string };
+      throw new Error(typeof body.error === 'string' ? body.error : body.error?.message || 'Could not build the draft');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileNameOf(res.headers.get('Content-Disposition'), `${part}${book ? `_book${book}` : ''}_draft.docx`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  /** Whole outline or manuscript is one file; every chosen book is its own file, one after another. */
   const run = async (only: number[] = []) => {
     setBusy(true);
     setOpen(false);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data?.session?.access_token;
-      const res = await fetch(`/api/export/project/${projectId}/draft/${part}${only.length ? `?books=${only.join(',')}` : ''}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } | string };
-        throw new Error(typeof body.error === 'string' ? body.error : body.error?.message || 'Could not build the draft');
+      if (!only.length) {
+        await fetchOne();
+        addToast(`The ${what} draft is downloading as a Word document.`, 'success');
+      } else {
+        for (const book of only) await fetchOne(book);
+        addToast(
+          only.length === 1
+            ? `Book ${only[0]} is downloading as a Word document.`
+            : `${only.length} Word documents are downloading, one per book (${only.join(', ')}). If your browser asks, allow multiple downloads.`,
+          'success',
+        );
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileNameOf(res.headers.get('Content-Disposition'), `${part}_draft.docx`);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      addToast(
-        only.length ? `${only.length === 1 ? `Book ${only[0]}` : `Books ${only.join(', ')}`} is downloading as a Word document.` : `The ${what} draft is downloading as a Word document.`,
-        'success',
-      );
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Could not build the draft', 'error');
     } finally {
@@ -104,7 +116,7 @@ export default function ExportDraftButton({ projectId, part, books = [] }: { pro
           >
             Whole manuscript (all {books.length} books)
           </button>
-          <p className="mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">Or pick books. Tick one or more, or export a single book.</p>
+          <p className="mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">Or pick books. Each book downloads as its own Word file.</p>
           <ul className="mt-1 max-h-72 space-y-1 overflow-y-auto">
             {books.map((b) => (
               <li key={b.index} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -144,7 +156,7 @@ export default function ExportDraftButton({ projectId, part, books = [] }: { pro
               onClick={() => run(picked)}
               className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
             >
-              {picked.length ? `Export ${picked.length} selected book${picked.length === 1 ? '' : 's'}` : 'Export selected books'}
+              {picked.length ? `Export ${picked.length} book${picked.length === 1 ? '' : 's'} (${picked.length} file${picked.length === 1 ? '' : 's'})` : 'Export selected books'}
             </button>
           </div>
         </div>
