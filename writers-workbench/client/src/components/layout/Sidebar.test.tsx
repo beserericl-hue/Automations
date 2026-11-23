@@ -1,13 +1,13 @@
 /**
  * The "My Projects" badge is the user's project count. It used to be the length of the sidebar's
- * list, which is capped at the 20 most recent, so a user with 37 projects saw "20" next to a
- * dashboard that said 37.
+ * list, which was capped at the 20 most recent, so a user with 37 projects saw "20" next to a
+ * dashboard that said 37. The list is no longer capped: every project is listed under the badge.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen, within } from '../../test/test-utils';
 import Sidebar from './Sidebar';
 
-const ROWS = Array.from({ length: 20 }, (_, i) => ({
+const ROWS = Array.from({ length: 37 }, (_, i) => ({
   id: `p${i}`, title: `Project ${i}`, status: 'outlined', updated_at: '2026-11-01T00:00:00Z',
 }));
 
@@ -35,10 +35,11 @@ vi.mock('../../config/supabase', () => {
 });
 
 describe('Sidebar My Projects', () => {
-  it('badges the real project count, while listing only the 20 most recent', async () => {
+  it('badges the real project count and lists every project, not just the most recent 20', async () => {
     renderWithProviders(<Sidebar open onToggle={() => {}} />);
     const header = await screen.findByRole('button', { name: /My Projects\s*37/ });
     expect(within(header).getByText('37')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /^Project \d+$/ })).toHaveLength(20);
+    expect(screen.getAllByRole('link', { name: /^Project \d+$/ })).toHaveLength(37);
+    expect(screen.getByRole('link', { name: /All Projects \(37\)/ })).toBeInTheDocument();
   });
 });
