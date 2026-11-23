@@ -55,5 +55,7 @@ describe('the hard-copy draft', () => {
     expect([chapterLabel(0, 'A'), chapterLabel(999, 'B'), chapterLabel(7, 'C'), chapterLabel(7, null), chapterLabel(null, 'D')]).toEqual([
       'Prologue: A', 'Epilogue: B', 'Chapter 7: C', 'Chapter 7', 'D',
     ]);
+    // A title that already names itself a prologue or epilogue is not given the word twice.
+    expect([chapterLabel(0, 'Prologue: The Surface'), chapterLabel(999, 'Epilogue')]).toEqual(['Prologue: The Surface', 'Epilogue']);
   });
 });
