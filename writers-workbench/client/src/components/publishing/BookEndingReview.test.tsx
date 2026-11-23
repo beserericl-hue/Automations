@@ -59,12 +59,33 @@ describe('reviewing how a book ends', () => {
     expect(screen.getByTestId('option-problems')).toHaveTextContent('chapter 65 shows this email first');
   });
 
-  it('drafts the closing scene from the chosen cliffhanger', async () => {
+  it('starts writing the closing scene when a cliffhanger is chosen, using that option\'s direction', async () => {
     serve(book({ cliffhangers: { options: [{ title: 'A decision', hook: 'h', scene: 'Adaeze alone at her desk.', uses: 'u', avoid: 'a' }] } }));
     renderWithProviders(<BookEndingReview />);
     fireEvent.click(await screen.findByTestId('use-direction'));
-    const box = await screen.findByDisplayValue('Adaeze alone at her desk.');
-    expect(box).toBeInTheDocument();
+    await waitFor(() => {
+      const post = mockFetch.mock.calls.find(([p, o]) => String(p).endsWith('/books/1/coda') && (o as { method?: string })?.method === 'POST');
+      expect(post, 'no request to write the closing scene').toBeTruthy();
+      expect(JSON.parse(String((post![1] as { body: string }).body))).toEqual({ direction: 'Adaeze alone at her desk.' });
+    });
+  });
+
+  it('asks before replacing a saved closing scene, and does not write until told to', async () => {
+    serve(book({ coda_draft: CODA, cliffhangers: { options: [{ title: 'A decision', hook: 'h', scene: 'Adaeze alone at her desk.', uses: 'u', avoid: 'a' }] } }));
+    renderWithProviders(<BookEndingReview />);
+    fireEvent.click(await screen.findByTestId('use-direction'));
+    expect(screen.getByText(/Writing a new one replaces it/)).toBeInTheDocument();
+    expect(mockFetch.mock.calls.some(([p, o]) => String(p).endsWith('/books/1/coda') && (o as { method?: string })?.method === 'POST')).toBe(false);
+    fireEvent.click(screen.getByTestId('confirm-write'));
+    await waitFor(() => expect(mockFetch.mock.calls.some(([p, o]) => String(p).endsWith('/books/1/coda') && (o as { method?: string })?.method === 'POST')).toBe(true));
+  });
+
+  it('explains what the screen does and that only Add it to the book changes the manuscript', async () => {
+    serve(book());
+    renderWithProviders(<BookEndingReview />);
+    const how = await screen.findByTestId('how-it-works');
+    expect(how).toHaveTextContent('Add it to the book');
+    expect(how).toHaveTextContent('after chapter 29');
   });
 
   it('runs the draft through the humanizer and puts the result in the draft only on request', async () => {
