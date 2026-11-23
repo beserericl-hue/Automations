@@ -53,8 +53,9 @@ function footer(): Footer {
 
 export function chapterLabel(n: number | null, title: string | null): string {
   const t = str(title);
-  if (n === 0) return t ? `Prologue: ${t}` : 'Prologue';
-  if (n === 999) return t ? `Epilogue: ${t}` : 'Epilogue';
+  // A title that already says Prologue or Epilogue is not given the word twice.
+  if (n === 0) return !t ? 'Prologue' : /^prologue\b/i.test(t) ? t : `Prologue: ${t}`;
+  if (n === 999) return !t ? 'Epilogue' : /^epilogue\b/i.test(t) ? t : `Epilogue: ${t}`;
   if (n == null) return t || 'Untitled chapter';
   return t ? `Chapter ${n}: ${t}` : `Chapter ${n}`;
 }
