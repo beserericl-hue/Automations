@@ -239,8 +239,19 @@ export async function buildOutlineDraft(project: DraftProject): Promise<Buffer> 
   return Buffer.from(await Packer.toBuffer(doc));
 }
 
-export async function buildManuscriptDraft(project: DraftProject, chapters: DraftChapter[]): Promise<Buffer> {
+/** One book of a series, for a manuscript draft that covers some of the books. */
+export interface DraftBook {
+  index: number;
+  title: string;
+  first_chapter: number;
+  last_chapter: number;
+}
+
+const BOOK_WORDS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
+
+export async function buildManuscriptDraft(project: DraftProject, chapters: DraftChapter[], books?: DraftBook[]): Promise<Buffer> {
   const written = chapters.filter((c) => str(c.content_text));
+  const bookName = (b: DraftBook) => `Book ${BOOK_WORDS[b.index] ?? b.index}${str(b.title) ? `: ${str(b.title)}` : ''}`;
   const title = new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 3600, after: 200 },
@@ -255,31 +266,47 @@ export async function buildManuscriptDraft(project: DraftProject, chapters: Draf
     alignment: AlignmentType.CENTER,
     children: [new TextRun({ text: `${written.length} chapters`, font: BODY_FONT, size: 24 })],
   });
-  const contents: Paragraph[] = [
-    new Paragraph({ children: [new PageBreak()] }),
-    heading('Chapters', HeadingLevel.HEADING_1, 32, 0),
-    ...written.map(
-      (c) => new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: chapterLabel(c.chapter_number, c.title), font: BODY_FONT, size: 24 })] }),
-    ),
-  ];
+  const bookLines = (books ?? []).map(
+    (b) => new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [new TextRun({ text: bookName(b), font: BODY_FONT, size: 26 })] }),
+  );
+  const listLine = (c: DraftChapter) =>
+    new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: chapterLabel(c.chapter_number, c.title), font: BODY_FONT, size: 24 })] });
+  const chapterHeading = (c: DraftChapter, first: boolean) =>
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      pageBreakBefore: !first,
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 480, after: 360 },
+      keepNext: true,
+      children: [new TextRun({ text: chapterLabel(c.chapter_number, c.title), bold: true, font: BODY_FONT, size: 32 })],
+    });
+  // Which chapters belong to which book. The epilogue (999) closes the last book.
+  const lastIndex = books?.length ? Math.max(...books.map((b) => b.index)) : 0;
+  const inBook = (b: DraftBook, n: number | null) => n != null && ((n >= b.first_chapter && n <= b.last_chapter) || (n === 999 && b.index === lastIndex));
+  const contents: Paragraph[] = [new Paragraph({ children: [new PageBreak()] }), heading('Chapters', HeadingLevel.HEADING_1, 32, 0)];
   const chapterBlocks: Paragraph[] = [];
-  for (const c of written) {
-    chapterBlocks.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        pageBreakBefore: true,
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 480, after: 360 },
-        keepNext: true,
-        children: [new TextRun({ text: chapterLabel(c.chapter_number, c.title), bold: true, font: BODY_FONT, size: 32 })],
-      }),
-      ...manuscriptParagraphs(c.content_text ?? ''),
-    );
+  if (books?.length) {
+    for (const b of books) {
+      const mine = written.filter((c) => inBook(b, c.chapter_number));
+      contents.push(new Paragraph({ spacing: { before: 200, after: 80 }, children: [new TextRun({ text: bookName(b), bold: true, font: BODY_FONT, size: 26 })] }), ...mine.map(listLine));
+      chapterBlocks.push(
+        new Paragraph({
+          pageBreakBefore: true,
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 4000, after: 200 },
+          children: [new TextRun({ text: bookName(b), bold: true, font: BODY_FONT, size: 48 })],
+        }),
+      );
+      mine.forEach((c) => chapterBlocks.push(chapterHeading(c, false), ...manuscriptParagraphs(c.content_text ?? '')));
+    }
+  } else {
+    contents.push(...written.map(listLine));
+    written.forEach((c) => chapterBlocks.push(chapterHeading(c, false), ...manuscriptParagraphs(c.content_text ?? '')));
   }
   const doc = new Document({
     creator: 'Writers Workbench',
     title: `${project.title}: manuscript`,
-    sections: [{ properties: pageProps, footers: { default: footer() }, children: [title, sub, count, ...contents, ...chapterBlocks] }],
+    sections: [{ properties: pageProps, footers: { default: footer() }, children: [title, sub, ...(books?.length ? bookLines : [count]), ...contents, ...chapterBlocks] }],
   });
   return Buffer.from(await Packer.toBuffer(doc));
 }

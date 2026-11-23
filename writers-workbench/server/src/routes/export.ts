@@ -9,7 +9,8 @@ import { z } from 'zod';
 import { buildEpub, epubFilename, type EpubChapter } from '../lib/epub.js';
 import { composeCover } from '../lib/cover.js';
 import { buildKdpPackage } from '../lib/kdp-package.js';
-import { buildManuscriptDraft, buildOutlineDraft, type DraftChapter } from '../lib/draft-docx.js';
+import { buildManuscriptDraft, buildOutlineDraft, type DraftBook, type DraftChapter } from '../lib/draft-docx.js';
+import { bookTitle, plannedBooks } from '../lib/series.js';
 import { loadBookSource } from '../lib/book-source.js';
 import { downloadCover, findCover } from '../lib/book-cover.js';
 
@@ -212,6 +213,7 @@ exportRouter.get('/project/:id/draft/:part', requireAuth, async (req, res) => {
       return;
     }
     let buffer: Buffer;
+    let bookSuffix = '';
     if (part === 'outline') {
       const hasOutline = Boolean(project.outline && (project.outline as Record<string, unknown>).chapters);
       if (!hasOutline) {
@@ -239,11 +241,35 @@ exportRouter.get('/project/:id/draft/:part', requireAuth, async (req, res) => {
         res.status(422).json({ success: false, error: { code: 'NO_CHAPTERS', message: 'This project has no chapters with text yet.' } });
         return;
       }
-      buffer = await buildManuscriptDraft({ title: project.title, outline: project.outline as Record<string, unknown> | null }, chapters);
+      // ?books=1,2 limits the draft to those books of the series; none means the whole manuscript.
+      const outline = project.outline as Record<string, unknown> | null;
+      const asked = String(req.query.books ?? '')
+        .split(',')
+        .map((x) => Number(x.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0);
+      let picked: DraftBook[] | undefined;
+      if (asked.length) {
+        const planned = plannedBooks(outline);
+        picked = planned
+          .filter((b) => asked.includes(b.index))
+          .sort((a, b) => a.index - b.index)
+          .map((b) => ({ index: b.index, title: bookTitle(outline, b.index), first_chapter: b.first_chapter, last_chapter: b.last_chapter }));
+        if (!picked.length) {
+          res.status(422).json({ success: false, error: { code: 'NO_BOOKS', message: 'None of those books exist in this project.' } });
+          return;
+        }
+        const has = chapters.some((c) => picked!.some((b) => c.chapter_number != null && ((c.chapter_number >= b.first_chapter && c.chapter_number <= b.last_chapter) || c.chapter_number === 999)) && (c.content_text ?? '').trim());
+        if (!has) {
+          res.status(422).json({ success: false, error: { code: 'NO_CHAPTERS', message: 'Those books have no chapters with text yet.' } });
+          return;
+        }
+      }
+      buffer = await buildManuscriptDraft({ title: project.title, outline }, chapters, picked);
+      bookSuffix = picked ? `_book${picked.map((b) => b.index).join('-')}` : '';
     }
     const base = String(project.title).replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'project';
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${base}_${part}_draft.docx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${base}${bookSuffix}_${part}_draft.docx"`);
     res.send(buffer);
   } catch (err) {
     logger.error({ err, userId: req.userId }, 'export: draft failed');

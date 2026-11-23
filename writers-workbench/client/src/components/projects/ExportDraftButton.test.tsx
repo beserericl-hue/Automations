@@ -35,4 +35,26 @@ describe('Export Draft', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/export/project/p1/draft/manuscript');
     expect(screen.getByTestId('export-draft-manuscript')).not.toBeDisabled();
   });
+
+  it('in a series: one book, or several chosen books, or the whole manuscript', async () => {
+    fetchMock.mockResolvedValue({ ok: true, blob: async () => new Blob(['x']), headers: new Headers() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const books = [1, 2, 3].map((i) => ({ index: i, title: `T${i}`, first_chapter: i * 10, last_chapter: i * 10 + 9 })) as never;
+    renderWithProviders(<ExportDraftButton projectId="p1" part="manuscript" books={books} />);
+    fireEvent.click(screen.getByTestId('export-draft-manuscript'));
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('export-draft-only-2'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/export/project/p1/draft/manuscript?books=2');
+    fireEvent.click(screen.getByTestId('export-draft-manuscript'));
+    fireEvent.click(screen.getByTestId('export-draft-book-3'));
+    fireEvent.click(screen.getByTestId('export-draft-book-1'));
+    fireEvent.click(screen.getByTestId('export-draft-selected'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/export/project/p1/draft/manuscript?books=1,3');
+    fireEvent.click(screen.getByTestId('export-draft-manuscript'));
+    fireEvent.click(screen.getByTestId('export-draft-all'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/export/project/p1/draft/manuscript');
+  });
 });
