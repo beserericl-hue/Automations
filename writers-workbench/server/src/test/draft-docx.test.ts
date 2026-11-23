@@ -32,6 +32,23 @@ describe('the hard-copy draft', () => {
     expect(xml).toContain('w:jc w:val="center"');
   });
 
+  it('limits the draft to the books asked for, each under its own book title', async () => {
+    const books = [
+      { index: 1, title: 'The Margin', first_chapter: 0, last_chapter: 1 },
+      { index: 2, title: 'The Box', first_chapter: 2, last_chapter: 3 },
+    ];
+    const two = await xmlOf(await buildManuscriptDraft({ title: 'The Ossuary', outline: null }, chapters, [books[1]]));
+    expect(two).toContain('Book Two: The Box');
+    expect(two).toContain('Chapter 2: The Box');
+    expect(two).toContain('Epilogue: After');
+    expect(two).not.toContain('Prologue: The Surface');
+    expect(two).not.toContain('Book One');
+    const both = await xmlOf(await buildManuscriptDraft({ title: 'The Ossuary', outline: null }, chapters, books));
+    expect(both).toContain('Book One: The Margin');
+    expect(both).toContain('Prologue: The Surface');
+    expect(both).toContain('Book Two: The Box');
+  });
+
   it('writes the outline: premise, characters, each chapter and its chapter outline', async () => {
     const xml = await xmlOf(
       await buildOutlineDraft({

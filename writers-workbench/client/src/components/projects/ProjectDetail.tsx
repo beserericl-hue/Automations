@@ -1216,7 +1216,7 @@ function ChaptersTab({
   return (
     <div className="space-y-2">
     <div className="flex justify-end">
-      <ExportDraftButton projectId={projectId} part="manuscript" />
+      <ExportDraftButton projectId={projectId} part="manuscript" books={books} />
     </div>
     <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
       <table className="w-full">
