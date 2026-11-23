@@ -44,7 +44,8 @@ describe('reviewing how a book ends', () => {
   it('shows how the book ends now, from the last chapter, without markup', async () => {
     serve(book());
     renderWithProviders(<BookEndingReview />);
-    expect(await screen.findByTestId('ending-tail')).toHaveTextContent('The light went pewter over the river. Nobody spoke.');
+    // The page appears before the last chapter has loaded; wait for its words.
+    await waitFor(() => expect(screen.getByTestId('ending-tail')).toHaveTextContent('The light went pewter over the river. Nobody spoke.'));
     expect(screen.getByTestId('ending-tail').textContent).not.toContain('<p>');
     expect(screen.getByText(/Settles the survey/)).toBeInTheDocument();
   });
