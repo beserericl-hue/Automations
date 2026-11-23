@@ -42,7 +42,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
     queryFn: async (): Promise<{ rows: SidebarProject[]; total: number }> => {
       if (isImpersonating) {
         const res = await apiFetch<ApiEnvelope<SidebarProject[]> & { total?: number }>(
-          '/api/impersonate/data/projects-summary?limit=20',
+          '/api/impersonate/data/projects-summary?limit=200',
         );
         const rows = res.data ?? [];
         return { rows, total: res.total ?? rows.length };
@@ -53,7 +53,9 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
         .eq('user_id', userId!)
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
-        .limit(20);
+        // Every project: the badge says how many there are, and the list under it has to show them all. It was
+        // capped at the 20 most recent, so projects 21 and beyond could only be reached from All Projects.
+        .limit(200);
       if (error) throw error;
       const rows = (data ?? []) as SidebarProject[];
       return { rows, total: count ?? rows.length };
@@ -160,7 +162,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
                   }`
                 }
               >
-                All Projects
+                All Projects{projectCount > 0 ? ` (${projectCount})` : ''}
               </NavLink>
               {projects?.map((project) => (
                 <NavLink
