@@ -29,6 +29,7 @@ import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport,
 import { normalizeOutlineChapter } from '../../types/database';
 import { useBooks, bookOf, BookHeaderRow, BookEndControls } from './BookDivisions';
 import ExportDraftButton from './ExportDraftButton';
+import ImportDraftButton from './ImportDraftButton';
 
 const TABS = ['overview', 'outline', 'chapters', 'qa', 'bible', 'art', 'social', 'research', 'cost', 'export', 'publish'] as const;
 type Tab = typeof TABS[number];
@@ -1210,12 +1211,20 @@ function ChaptersTab({
   const { books } = useBooks(projectId);
 
   if (!chapters?.length) {
-    return <EmptyState message="No chapters written yet. Use the chat or Eve to write your first chapter." />;
+    return (
+      <div className="space-y-2">
+        <div className="flex justify-end">
+          <ImportDraftButton projectId={projectId} />
+        </div>
+        <EmptyState message="No chapters written yet. Use the chat or Eve to write your first chapter, or import an edited draft." />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-2">
-    <div className="flex justify-end">
+    <div className="flex justify-end gap-2">
+      <ImportDraftButton projectId={projectId} />
       <ExportDraftButton projectId={projectId} part="manuscript" books={books} />
     </div>
     <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
