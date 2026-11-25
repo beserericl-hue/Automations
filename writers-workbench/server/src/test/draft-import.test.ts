@@ -37,3 +37,24 @@ describe('reading an edited draft back', () => {
     expect(got.map((c) => [c.chapter_number, c.text])).toEqual([[1, 'Real text.'], [2, 'More & more.']]);
   });
 });
+
+import { planOf } from '../routes/draft-import.js';
+describe('titles in the file win', () => {
+  it('flags a renamed chapter and leaves a matching or untitled one alone', () => {
+    const existing = new Map([
+      [1, { id: 'a', chapter_number: 1, title: 'Old', status: 'draft', content_text: 'x' }],
+      [2, { id: 'b', chapter_number: 2, title: 'Same', status: 'approved', content_text: 'x' }],
+      [3, { id: 'c', chapter_number: 3, title: 'Kept', status: 'draft', content_text: 'x' }],
+    ]);
+    const plan = planOf(
+      [
+        { chapter_number: 1, title: 'New', text: 't', words: 1 },
+        { chapter_number: 2, title: 'Same', text: 't', words: 1 },
+        { chapter_number: 3, title: '', text: 't', words: 1 },
+      ],
+      existing,
+    );
+    expect(plan.map((p) => p.renamed_from)).toEqual(['Old', null, null]);
+    expect(plan[2].title).toBe('Kept');
+  });
+});

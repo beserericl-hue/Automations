@@ -19,6 +19,7 @@ interface PlanItem {
   status: string | null;
   existing_words: number;
   has_blocks: boolean;
+  renamed_from: string | null;
 }
 interface Preview {
   items: PlanItem[];
@@ -150,6 +151,7 @@ export default function ImportDraftButton({ projectId }: { projectId: string }) 
                       <span className="min-w-0 text-gray-800 dark:text-gray-200">
                         <span className="font-medium">{labelOf(i.chapter_number)}</span>
                         {i.title ? `: ${i.title}` : ''}
+                        {i.renamed_from != null && <span className="block text-blue-700 dark:text-blue-400">Renamed from “{i.renamed_from}”</span>}
                         {i.has_blocks && <span className="block text-amber-700 dark:text-amber-400">Has formatted blocks (letters or poems) that Word cannot carry back; they become plain paragraphs. The old text stays in history.</span>}
                       </span>
                       <span className="whitespace-nowrap text-gray-500 dark:text-gray-400">
