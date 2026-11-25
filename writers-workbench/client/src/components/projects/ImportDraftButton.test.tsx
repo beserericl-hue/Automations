@@ -14,7 +14,7 @@ beforeEach(() => {
 
 const preview = {
   items: [
-    { chapter_number: 0, title: 'Surface', words: 100, action: 'replace', status: 'draft', existing_words: 90, has_blocks: false },
+    { chapter_number: 0, title: 'Surface', words: 100, action: 'replace', status: 'draft', existing_words: 90, has_blocks: false, renamed_from: 'Old Surface' },
     { chapter_number: 2, title: 'Box', words: 200, action: 'new_version', status: 'approved', existing_words: 180, has_blocks: true },
     { chapter_number: 97, title: 'New', words: 300, action: 'add', status: null, existing_words: 0, has_blocks: false },
   ],
@@ -34,6 +34,7 @@ describe('Import Draft', () => {
     fireEvent.change(screen.getByTestId('import-draft-file'), { target: { files: [file] } });
     expect(await screen.findByTestId('import-draft-summary')).toHaveTextContent('3 chapters in the file');
     expect(screen.getByText(/Has formatted blocks/)).toBeInTheDocument();
+    expect(screen.getByText(/Renamed from “Old Surface”/)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe('/api/draft-import/project/p1/preview');
     fireEvent.click(screen.getByTestId('import-draft-apply'));

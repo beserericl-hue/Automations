@@ -4,7 +4,7 @@
  *   POST /api/draft-import/project/:id/preview   (multipart `file`)  what would happen, changing nothing
  *   POST /api/draft-import/project/:id/apply     (multipart `file`)  do it, then queue a Q/A run per chapter
  *
- * Chapters are matched by chapter number and the book divisions are never touched. A chapter that is
+ * Chapters are matched by chapter number, the file's chapter titles win over the project's, and the book divisions are never touched. A chapter that is
  * still a draft has its text replaced. A chapter that is approved, published, scheduled or rejected is
  * preserved: its current text is kept in version history, the editor's text becomes the newer version
  * and the chapter goes back to draft until the Q/A passes and the author approves it again. A chapter
@@ -50,6 +50,8 @@ export interface PlanItem {
   existing_words: number;
   /** The saved chapter has formatting blocks (letters, poems) that Word cannot carry back. */
   has_blocks: boolean;
+  /** The project's current title when the file names the chapter differently; the file wins. */
+  renamed_from: string | null;
 }
 
 const wordCount = (t: string | null) => (t && t.trim() ? t.trim().split(/\s+/).length : 0);
@@ -74,12 +76,13 @@ async function loadExisting(projectId: string, userId: string): Promise<Map<numb
   return map;
 }
 
-function planOf(chapters: ImportedChapter[], existing: Map<number, Existing>): PlanItem[] {
+export function planOf(chapters: ImportedChapter[], existing: Map<number, Existing>): PlanItem[] {
   return chapters.map((c) => {
     const e = existing.get(c.chapter_number);
     return {
       chapter_number: c.chapter_number,
       title: c.title || e?.title || '',
+      renamed_from: e && c.title && c.title !== (e.title ?? '').trim() ? (e.title ?? '') : null,
       words: c.words,
       action: !e ? 'add' : e.status === 'draft' ? 'replace' : 'new_version',
       status: e?.status ?? null,
@@ -217,7 +220,7 @@ draftImportRouter.post('/project/:id/apply', withUpload, async (req, res) => {
           }
           const { error } = await supabase
             .from('published_content_v2')
-            .update({ content_text: c.text, status: 'draft', updated_at: new Date().toISOString() })
+            .update({ content_text: c.text, status: 'draft', ...(c.title ? { title: c.title } : {}), updated_at: new Date().toISOString() })
             .eq('id', e.id)
             .eq('user_id', userId);
           if (error) throw new Error(error.message);
