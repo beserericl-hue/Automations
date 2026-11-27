@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
@@ -1177,6 +1177,49 @@ function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; pr
   );
 }
 
+type QaJob = { chapter_number: number; status: 'in_progress' | 'complete' | 'error'; error: string | null };
+
+/** Where each chapter's latest Q/A run stands, polled while any is running, so an import's Q/A is visible. */
+function useChapterQaJobs(projectId: string) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ['project-qa-jobs', projectId],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const { data: rows } = await supabase
+        .from('engine_job_runs')
+        .select('chapter_number, status, error, created_at')
+        .eq('project_id', projectId)
+        .eq('op', 'qa')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      const latest: Record<number, QaJob> = {};
+      for (const r of (rows ?? []) as QaJob[]) if (r.chapter_number != null && !(r.chapter_number in latest)) latest[r.chapter_number] = r;
+      return latest;
+    },
+    refetchInterval: (q) => (Object.values(q.state.data ?? {}).some((j) => j.status === 'in_progress') ? 4000 : false),
+  });
+  const running = Object.values(data ?? {}).filter((j) => j.status === 'in_progress').length;
+  const before = useRef(0);
+  useEffect(() => {
+    // The last run just finished: pull in the scores and reports it saved.
+    if (before.current > 0 && running === 0) {
+      void qc.invalidateQueries({ queryKey: ['project-chapter-qa', projectId] });
+      void qc.invalidateQueries({ queryKey: ['project-chapters', projectId] });
+    }
+    before.current = running;
+  }, [running, projectId, qc]);
+  return { jobs: data ?? {}, running };
+}
+
+function QaJobTag({ job }: { job?: QaJob }) {
+  if (!job) return null;
+  if (job.status === 'in_progress') return <span data-testid="qa-running" className="block text-xs text-blue-600 dark:text-blue-400 animate-pulse">Q/A running…</span>;
+  if (job.status === 'error') return <span className="block text-xs text-red-600" title={job.error ?? ''}>Q/A failed</span>;
+  return <span className="block text-xs text-gray-500 dark:text-gray-400">Q/A done</span>;
+}
+
 function ChaptersTab({
   chapters,
   qaByChapter,
@@ -1209,6 +1252,7 @@ function ChaptersTab({
     label: string;
   } | null>(null);
   const { books } = useBooks(projectId);
+  const { jobs: qaJobs, running: qaRunning } = useChapterQaJobs(projectId);
 
   if (!chapters?.length) {
     return (
@@ -1223,7 +1267,12 @@ function ChaptersTab({
 
   return (
     <div className="space-y-2">
-    <div className="flex justify-end gap-2">
+    <div className="flex items-center justify-end gap-3">
+      {qaRunning > 0 && (
+        <span data-testid="qa-running-banner" className="text-xs text-blue-600 dark:text-blue-400">
+          Q/A running on {qaRunning} chapter{qaRunning === 1 ? '' : 's'}; this list updates as each finishes.
+        </span>
+      )}
       <ImportDraftButton projectId={projectId} />
       <ExportDraftButton projectId={projectId} part="manuscript" books={books} />
     </div>
@@ -1275,7 +1324,7 @@ function ChaptersTab({
                   </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">{wordCount.toLocaleString()}</td>
-                <td className="px-4 py-3"><ChapterQaBadge qa={ch.chapter_number != null ? qaByChapter?.[ch.chapter_number] : undefined} /></td>
+                <td className="px-4 py-3">{ch.chapter_number != null && qaJobs[ch.chapter_number]?.status === 'in_progress' ? null : <ChapterQaBadge qa={ch.chapter_number != null ? qaByChapter?.[ch.chapter_number] : undefined} />}<QaJobTag job={ch.chapter_number != null ? qaJobs[ch.chapter_number] : undefined} /></td>
                 <td className="px-4 py-3">
                   <StatusBadge status={ch.status} />
                 </td>
