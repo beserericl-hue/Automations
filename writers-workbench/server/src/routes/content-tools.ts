@@ -36,6 +36,7 @@ import { applyRename, findMentions, nameAmbiguity, namesInText, type Mention } f
 import { normalizeOutline } from '../lib/outline-schema.js';
 import { getCreditCost, humanizeUnits } from '../services/credit-costs.js';
 import { chargeCredits, refuseIfInsufficient } from '../lib/credit-charge.js';
+import { locateSpan, replacementForSpan } from './content-actions.js';
 
 export const contentToolsRouter = Router();
 contentToolsRouter.use(requireAuth);
@@ -389,13 +390,15 @@ contentToolsRouter.post('/:id/humanize/apply', validateBody(ApplyBody), async (r
   if (!chapter) return;
   const { original, replacement } = req.body as z.infer<typeof ApplyBody>;
   const text = chapter.content_text ?? '';
-  const at = text.indexOf(original);
-  if (at < 0) {
+  // Exact first; otherwise find it the way the review fixes do (ignores paragraph breaks, tags and *italics* markers).
+  const exact = text.indexOf(original);
+  const span = exact >= 0 ? { from: exact, to: exact + original.length } : locateSpan(text, original);
+  if (!span) {
     res.status(422).json({
       success: false,
       error: {
         code: 'PASSAGE_NOT_FOUND',
-        message: 'That passage is not in the saved chapter as selected. Save first, and select within the text of the paragraphs (not across a heading).',
+        message: 'That passage could not be found in the saved chapter. If you have edited the chapter since selecting it, click Save (top right of the editor), then select the passage again. Select within the paragraphs, not across a heading.',
       },
     });
     return;
@@ -410,7 +413,7 @@ contentToolsRouter.post('/:id/humanize/apply', validateBody(ApplyBody), async (r
     changed_by: 'humanizer',
     change_note: 'Before replacing a passage with its humanized version',
   });
-  const updated = text.slice(0, at) + replacement + text.slice(at + original.length);
+  const updated = text.slice(0, span.from) + replacementForSpan(replacement, text.slice(span.from, span.to)) + text.slice(span.to);
   await supabase.from('published_content_v2').update({ content_text: updated, updated_at: new Date().toISOString() }).eq('id', chapter.id).eq('user_id', req.userId!);
   logger.info({ userId: req.userId, contentId: chapter.id }, 'content-tools: humanized passage applied');
   res.json({ success: true, data: { replaced: true } });

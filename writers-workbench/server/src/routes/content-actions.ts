@@ -200,7 +200,9 @@ export function locateSpan(text: string, quote: string): { from: number; to: num
       .replace(/&/g, '(?:&|&amp;)')
       .replace(/'/g, "(?:'|&#39;|&apos;)")
       .replace(/"/g, '(?:"|&quot;)');
-  const re = new RegExp(words.map(esc).join('(?:\\s|<[^>]*>)+'));
+  // A chapter written by the engine or imported from Word keeps *italics* markers and blank-line
+  // paragraphs; the text a person selects in the editor has neither.
+  const re = new RegExp(words.map((w) => `\\**${esc(w)}\\**`).join('(?:\\s|<[^>]*>|\\*)+'));
   const m = re.exec(text);
   return m ? { from: m.index, to: m.index + m[0].length } : null;
 }
